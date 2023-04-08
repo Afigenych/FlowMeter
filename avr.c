@@ -32,19 +32,32 @@ CLKCTRL_MCLKINTFLAGS = CLKCTRL_CFDEN_bm;	//not used CCP_IOREG; reset flag CFDEN
 CLKCTRL_OSCHFCTRLA = CLKCTRL_RUNSTBY_bm | CLKCTRL_FRQSEL_24M_gc | CLKCTRL_AUTOTUNE_bm;
 CLKCTRL_PLLCTRLA = CLKCTRL_MULFAC_DISABLE_gc;
 CLKCTRL_OSC32KCTRLA = CLKCTRL_RUNSTDBY_bm | CLKCTRL_SEL_bm;
-CLKCTRL_XOSCHFCTRLA = CLKCTRL_RUNSTDBY_bm | CLKCTRL_CSUTHF_256_gc | CLKCTRL_FRQRANGE_24M_gc | CLKCTRL_SELHF_XTAL_gc | CLKCTRL_ENABLE_bm;
+CLKCTRL_XOSCHFCTRLA = (CLKCTRL_RUNSTDBY_bm | CLKCTRL_CSUTHF_256_gc | CLKCTRL_FRQRANGE_24M_gc | CLKCTRL_ENABLE_bm) &  ~CLKCTRL_SELHF_XTAL_gc;
 CPU_CCP &= ~(CCP_IOREG_gc); //need write another value?
 
 //init CPU_INT
 CPU_CCP = CCP_IOREG_gc;
-CPUINT_CTRLA = (CPUINT_IVSEL_bm & ~CPUINT_CVT_bm) & ~CPUINT_LVL0RR_bm;
+CPUINT_CTRLA = (CPUINT_IVSEL_bm & ~CPUINT_CVT_bm) | CPUINT_LVL0RR_bm;//int_vect start of the BOOT section, CVT - disable, Robin Round Priority enable
 CPU_CCP &= ~(CCP_IOREG_gc); //need write another value?
-CPUINT_LVL1VEC = RTC_PIT_vect_num;
+//CPUINT_LVL1VEC = RTC_PIT_vect_num;
 
 //init ports
 PORTMUX_TWIROUTEA = PORTMUX_TWI0_DEFAULT_gc;								//ports for TWI
 PORTMUX_SPIROUTEA = PORTMUX_SPI0_DEFAULT_gc;								//ports for SPI
 PORTMUX_USARTROUTEA = PORTMUX_USART0_ALT3_gc | PORTMUX_USART1_DEFAULT_gc;	//ports for USART0, USART1
+
+//init output pins 
+VPORTD_DIR = OUT_LDAC_bm | EN_HART_bm;
+VPORTD_OUT |= OUT_LDAC_bm & ~EN_HART_bm;
+VPORTF_DIR = OUT_SS1_bm | OUT_SS2_bm | OUT_SS3_bm | OUT_SS4_bm;
+VPORTF_OUT |= OUT_SS1_bm |OUT_SS2_bm | OUT_SS3_bm | OUT_SS4_bm;
+
+//init input pin
+PORTD_DIRCLR = INP_INT_bm;
+PORTF_DIRCLR = INP_MFP_bm;
+
+//init port for interrupt
+PORTD_PIN1CTRL = PORT_ISC_FALLING_gc;
 
 //init BOD (Brown_out_Detector)
 //BOD_CTRLA load from FUSE_BODCFG during reset
@@ -59,7 +72,7 @@ BOD_INTCTRL = BOD_VLMCFG_BOTH_gc | BOD_VLMIE_bm;
 //init RTC
 RTC_PITCTRLA = RTC_PERIOD_CYC1024_gc | RTC_PITEN_bm;
 RTC_PITINTCTRL |= RTC_PITEN_bm;
-asm("WDR");
+//asm("WDR");
 
 // init twi bits
 TWI0_CTRLA = TWI_INPUTLVL_I2C_gc | TWI_SDASETUP_4CYC_gc | TWI_SDAHOLD_50NS_gc | TWI_FMPEN_OFF_gc;
@@ -67,9 +80,20 @@ TWI0_DUALCTRL = TWI_INPUTLVL_I2C_gc | TWI_SDAHOLD_OFF_gc | TWI_FMPEN_OFF_gc | TW
 TWI0_DBGCTRL = TWI_DBGRUN_RUN_gc;
 
 //init twi host
-TWI0_MBAUD = BAUD_RATE_TWI;
-TWI0_MCTRLA = TWI_ENABLE_bp;
+TWI0_MBAUD = BAUD_RATE_TWI;//need correction after measurement CLK
+TWI0_MCTRLA = TWI_ENABLE_bm | TWI_SMEN_bm |TWI_TIMEOUT_200US_gc ; //Enable HOST, SMART mode enable, TIMEOUT 200 mks
 TWI0_MSTATUS = TWI_BUSSTATE_IDLE_gc;
 
+//init spi port
+VPORTA_DIR = PIN4_bm | PIN6_bm | PIN7_bm; // MOSI - output; SCK - output; SS - output
+VPORTA_OUT = PIN7_bm;	//SCK=0; SS = 1
+SPI0_CTRLA = SPI_MASTER_bm | ((~SPI_DORD_bm & ~SPI_CLK2X_bm) &  SPI_PRESC_DIV4_gc);
+SPI0_CTRLB = (SPI_MODE_1_gc | SPI_BUFEN_bm | SPI_BUFWR_bm) & (~SPI_SSD_bm) ;
+SPI0_CTRLA |= SPI_ENABLE_bm;
+SPI0_INTCTRL = SPI_RXCIE_bm | SPI_TXCIE_bp | SPI_DREIE_bm | (~SPI_SSIE_bm &  ~SPI_IE_bm);
+//init usart0 port
+//init usart1 port
+
+asm("sei"); //set Global Interrupt Enable Bit
 
 };

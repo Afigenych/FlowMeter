@@ -6,6 +6,7 @@
  */ 
 
 #include "ioavr64dd32.h"
+#include "rtc.h"
 #include "main.h"
 #include "wdt.h"
 

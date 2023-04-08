@@ -11,6 +11,7 @@
 
 #endif /* INT_H_ */
 
+#define PORTD1_INT 0x01;
 
 void init_BOD (void);
 void sowtware_reset (void);
